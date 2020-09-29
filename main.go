@@ -1,73 +1,100 @@
 package main
 
 import (
-	"fmt"
-	"os"
-	"os/exec"
-
+	"errors"
 	"fyne.io/fyne"
-
 	"fyne.io/fyne/app"
 	"fyne.io/fyne/widget"
+	"github.com/mitchellh/go-homedir"
+	"io"
+	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
 )
 
-func runDocker() {
+func stopContainer(containerName string, logger *log.Logger, stdWriter io.Writer) {
+	dockerExecutablePath := getDockerExecutablePath()
 
-	docker_executable := "/usr/local/bin/docker"
+	dockerStopContainerCommand := []string{dockerExecutablePath, "stop", containerName}
 
-	docker_stop_container_commnad := []string{docker_executable, "stop", "liferay-master"}
+	logger.Println("Stopping container " + containerName)
 
-	docker_command := &exec.Cmd{
-		Path:   docker_executable,
-		Args:   docker_stop_container_commnad,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
+	dockerCommand := &exec.Cmd{
+		Path:   dockerExecutablePath,
+		Args:   dockerStopContainerCommand,
+		Stdout: stdWriter,
+		Stderr: stdWriter,
 	}
 
-	fmt.Println(docker_command.String())
+	dockerCommand.Run()
+}
 
-	docker_command.Run()
+func runDocker(containerName string, imageName string, logger *log.Logger, portMapping string, stdWriter io.Writer) error {
 
-	docker_remove_container_commnad := []string{docker_executable, "rm", "liferay-master"}
+	dockerExecutablePath := getDockerExecutablePath()
 
-	docker_command = &exec.Cmd{
-		Path:   docker_executable,
-		Args:   docker_remove_container_commnad,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
+	logger.Println("Stopping container " + containerName)
+
+	stopContainer(containerName, logger, stdWriter)
+
+	logger.Println("Removing container " + containerName)
+
+	dockerRemoveContainerCommand := []string{dockerExecutablePath, "rm", containerName}
+
+	dockerCommand := &exec.Cmd{
+		Path:   dockerExecutablePath,
+		Args:   dockerRemoveContainerCommand,
+		Stdout: stdWriter,
+		Stderr: stdWriter,
 	}
 
-	fmt.Println(docker_command.String())
+	dockerCommand.Run()
 
-	docker_command.Run()
+	logger.Println("Removing Image " + imageName)
 
-	docker_remove_image_commnad := []string{docker_executable, "rmi", "jeyvison/liferay-master:latest"}
+	dockerRemoveImageCommand := []string{dockerExecutablePath, "rmi", imageName}
 
-	docker_command = &exec.Cmd{
-		Path:   docker_executable,
-		Args:   docker_remove_image_commnad,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
+	dockerCommand = &exec.Cmd{
+		Path:   dockerExecutablePath,
+		Args:   dockerRemoveImageCommand,
+		Stdout: stdWriter,
+		Stderr: stdWriter,
 	}
 
-	fmt.Println(docker_command.String())
+	dockerCommand.Run()
 
-	docker_command.Run()
+	logger.Println("Running image " + imageName + " with container name " + containerName)
 
-	docker_command = &exec.Cmd{
-		Path:   docker_executable,
-		Args:   []string{docker_executable, "run", "-d", "-p", "8080:8080", "--name", "liferay-master", "jeyvison/liferay-master:latest"},
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
+	dockerCommand = &exec.Cmd{
+		Path:   dockerExecutablePath,
+		Args:   []string{dockerExecutablePath, "run", "-d", "-p", portMapping, "--name", containerName, imageName},
+		Stdout: stdWriter,
+		Stderr: stdWriter,
 	}
 
-	fmt.Println(docker_command.String())
+	err := dockerCommand.Run()
 
-	error := docker_command.Run()
-
-	if error != nil {
-		fmt.Println(error)
+	if err != nil {
+		logger.Println(err.Error())
 	}
+
+	return err
+}
+
+func getDockerExecutablePath() string {
+	return "/usr/local/bin/docker"
+}
+
+func imageVersions() (*widget.Radio, *widget.Box) {
+
+	radio := widget.NewRadio([]string{"Liferay CE", "Liferay DXP"}, nil)
+
+	radio.Horizontal = true
+
+	hbox := widget.NewHBox(radio)
+
+	return radio, hbox
 }
 
 func main() {
@@ -76,25 +103,73 @@ func main() {
 
 	w.Resize(fyne.NewSize(300, 300))
 
+	vbox := widget.NewVBox()
+
+	liferayVersionRadio, liferayVersionRadioBox := imageVersions()
+
+	liferayVersionRadio.Required = true
+
+	vbox.Append(liferayVersionRadioBox)
+
 	button := widget.NewButton("Create/Update Liferay", nil)
 
-	vbox := widget.NewVBox(button)
+	vbox.Append(button)
 
-	ipb := widget.NewProgressBarInfinite()
+	progressBarInfinite := widget.NewProgressBarInfinite()
 
-	ipb.Hide()
+	progressBarInfinite.Hide()
 
-	vbox.Append(ipb)
+	vbox.Append(progressBarInfinite)
 
 	button.OnTapped = func() {
-		ipb.Show()
+		progressBarInfinite.Show()
 		button.Disable()
-		runDocker()
-		ipb.Hide()
+
+		logger, stdWriter := getLogger(vbox)
+
+		var err error = nil
+
+		switch liferayVersionRadio.Selected {
+		case "Liferay CE":
+			stopContainer("liferay-dxp-master", logger, stdWriter)
+			err = runDocker("liferay-master", "jeyvison/liferay-master:latest", logger, "8080:8080", stdWriter)
+		case "Liferay DXP":
+			stopContainer("liferay-master", logger, stdWriter)
+			err = runDocker("liferay-dxp-master", "192.168.109.41:5000/jeyvison/liferay-dxp-master:latest", logger, "8081:7300", stdWriter)
+		default:
+			err = errors.New("You must select one of of the versions")
+		}
+
+		if err != nil {
+			vbox.Append(widget.NewLabel(err.Error()))
+		}
+
+		progressBarInfinite.Hide()
 		button.Enable()
 	}
 
 	w.SetContent(vbox)
 
 	w.ShowAndRun()
+}
+
+func getLogger(vbox *widget.Box) (*log.Logger, io.Writer) {
+	var userDir, err = homedir.Dir()
+
+	if err != nil {
+		vbox.Append(widget.NewLabel(err.Error()))
+	}
+
+	logFilePath := filepath.FromSlash(userDir + "/liferay-docker-control.log")
+
+	var LogFile, errFile = os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+
+	if errFile != nil {
+		vbox.Append(widget.NewLabel(errFile.Error()))
+	}
+
+	var logger = log.New(LogFile, "logging: ", log.Ldate)
+
+	stdWriter := logger.Writer()
+	return logger, stdWriter
 }
