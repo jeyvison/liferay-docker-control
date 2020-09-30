@@ -5,86 +5,10 @@ import (
 	"fyne.io/fyne"
 	"fyne.io/fyne/app"
 	"fyne.io/fyne/widget"
-	"github.com/mitchellh/go-homedir"
-	"io"
-	"log"
-	"os"
-	"os/exec"
-	"path/filepath"
+	"github.com/jeyvison/liferay-docker-control/ldcDocker"
 )
 
-func stopContainer(containerName string, logger *log.Logger, stdWriter io.Writer) {
-	dockerExecutablePath := getDockerExecutablePath()
-
-	dockerStopContainerCommand := []string{dockerExecutablePath, "stop", containerName}
-
-	logger.Println("Stopping container " + containerName)
-
-	dockerCommand := &exec.Cmd{
-		Path:   dockerExecutablePath,
-		Args:   dockerStopContainerCommand,
-		Stdout: stdWriter,
-		Stderr: stdWriter,
-	}
-
-	dockerCommand.Run()
-}
-
-func runDocker(containerName string, imageName string, logger *log.Logger, portMapping string, stdWriter io.Writer) error {
-
-	dockerExecutablePath := getDockerExecutablePath()
-
-	logger.Println("Stopping container " + containerName)
-
-	stopContainer(containerName, logger, stdWriter)
-
-	logger.Println("Removing container " + containerName)
-
-	dockerRemoveContainerCommand := []string{dockerExecutablePath, "rm", containerName}
-
-	dockerCommand := &exec.Cmd{
-		Path:   dockerExecutablePath,
-		Args:   dockerRemoveContainerCommand,
-		Stdout: stdWriter,
-		Stderr: stdWriter,
-	}
-
-	dockerCommand.Run()
-
-	logger.Println("Removing Image " + imageName)
-
-	dockerRemoveImageCommand := []string{dockerExecutablePath, "rmi", imageName}
-
-	dockerCommand = &exec.Cmd{
-		Path:   dockerExecutablePath,
-		Args:   dockerRemoveImageCommand,
-		Stdout: stdWriter,
-		Stderr: stdWriter,
-	}
-
-	dockerCommand.Run()
-
-	logger.Println("Running image " + imageName + " with container name " + containerName)
-
-	dockerCommand = &exec.Cmd{
-		Path:   dockerExecutablePath,
-		Args:   []string{dockerExecutablePath, "run", "-d", "-p", portMapping, "--name", containerName, imageName},
-		Stdout: stdWriter,
-		Stderr: stdWriter,
-	}
-
-	err := dockerCommand.Run()
-
-	if err != nil {
-		logger.Println(err.Error())
-	}
-
-	return err
-}
-
-func getDockerExecutablePath() string {
-	return "/usr/local/bin/docker"
-}
+var dockerControl = ldcDocker.DockerControl{}
 
 func imageVersions() (*widget.Radio, *widget.Box) {
 
@@ -125,17 +49,15 @@ func main() {
 		progressBarInfinite.Show()
 		button.Disable()
 
-		logger, stdWriter := getLogger(vbox)
-
 		var err error = nil
 
 		switch liferayVersionRadio.Selected {
 		case "Liferay CE":
-			stopContainer("liferay-dxp-master", logger, stdWriter)
-			err = runDocker("liferay-master", "jeyvison/liferay-master:latest", logger, "8080:8080", stdWriter)
+			dockerControl.StopContainer("liferay-dxp-master")
+			err = dockerControl.RunDocker("liferay-master", "jeyvison/liferay-master:latest", "8080:8080")
 		case "Liferay DXP":
-			stopContainer("liferay-master", logger, stdWriter)
-			err = runDocker("liferay-dxp-master", "192.168.109.41:5000/jeyvison/liferay-dxp-master:latest", logger, "8081:7300", stdWriter)
+			dockerControl.StopContainer("liferay-master")
+			err = dockerControl.RunDocker("liferay-dxp-master", "192.168.109.41:5000/jeyvison/liferay-dxp-master:latest", "8081:7300")
 		default:
 			err = errors.New("You must select one of of the versions")
 		}
@@ -151,25 +73,4 @@ func main() {
 	w.SetContent(vbox)
 
 	w.ShowAndRun()
-}
-
-func getLogger(vbox *widget.Box) (*log.Logger, io.Writer) {
-	var userDir, err = homedir.Dir()
-
-	if err != nil {
-		vbox.Append(widget.NewLabel(err.Error()))
-	}
-
-	logFilePath := filepath.FromSlash(userDir + "/liferay-docker-control.log")
-
-	var LogFile, errFile = os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-
-	if errFile != nil {
-		vbox.Append(widget.NewLabel(errFile.Error()))
-	}
-
-	var logger = log.New(LogFile, "logging: ", log.Ldate)
-
-	stdWriter := logger.Writer()
-	return logger, stdWriter
 }
