@@ -1,4 +1,4 @@
-[![Coverage Status](https://coveralls.io/repos/github/jeyvison/liferay-docker-control/badge.svg?branch=master)](https://coveralls.io/github/jeyvison/liferay-docker-control?branch=master)
+[![Build Status](https://travis-ci.com/jeyvison/liferay-docker-control.svg?branch=master)](https://travis-ci.com/jeyvison/liferay-docker-control)
 
 # Liferay Docker Control
 
