@@ -1,3 +1,5 @@
+[![Coverage Status](https://coveralls.io/repos/github/jeyvison/liferay-docker-control/badge.svg?branch=master)](https://coveralls.io/github/jeyvison/liferay-docker-control?branch=master)
+
 # Liferay Docker Control
 
 Liferay docker control is  a go-based application that let's you download daily docker images of Liferay's latest master.
