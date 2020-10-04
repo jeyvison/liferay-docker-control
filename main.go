@@ -8,6 +8,12 @@ import (
 	"github.com/jeyvison/liferay-docker-control/ldcDocker"
 )
 
+type MainControl struct {
+	buttons map[string]*widget.Button
+	window  fyne.Window
+	vbox *widget.Box
+}
+
 var dockerControl = ldcDocker.DockerControl{}
 
 func imageVersions() (*widget.Radio, *widget.Box) {
@@ -21,13 +27,14 @@ func imageVersions() (*widget.Radio, *widget.Box) {
 	return radio, hbox
 }
 
-func main() {
-	a := app.New()
-	w := a.NewWindow("Liferay Docker Control")
+func (mainControl *MainControl) loadUI(app fyne.App) {
+	mainControl.window = app.NewWindow("Liferay Docker Control")
 
-	w.Resize(fyne.NewSize(300, 300))
+	mainControl.window.Resize(fyne.NewSize(300, 300))
 
 	vbox := widget.NewVBox()
+
+	mainControl.vbox = vbox
 
 	liferayVersionRadio, liferayVersionRadioBox := imageVersions()
 
@@ -38,6 +45,8 @@ func main() {
 	button := widget.NewButton("Create/Update Liferay", nil)
 
 	vbox.Append(button)
+
+	mainControl.buttons[button.Text] = button
 
 	progressBarInfinite := widget.NewProgressBarInfinite()
 
@@ -70,7 +79,23 @@ func main() {
 		button.Enable()
 	}
 
-	w.SetContent(vbox)
+	mainControl.window.SetContent(vbox)
 
-	w.ShowAndRun()
+	mainControl.window.ShowAndRun()
+}
+
+func newMainControl() *MainControl {
+	mainControl := &MainControl{}
+	mainControl.buttons = make(map[string]*widget.Button)
+
+	return mainControl
+}
+
+func main() {
+	a := app.New()
+
+	mainControl := newMainControl()
+
+	mainControl.loadUI(a)
+
 }
