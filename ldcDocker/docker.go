@@ -12,11 +12,9 @@ func getDockerExecutablePath() string {
 	return "/usr/local/bin/docker"
 }
 
-var logManager = ldcLog.DefaultLogManager
+var logger = ldcLog.DefaultLogger
 
-var logger = logManager.Logger
-
-var loggerWriter = logManager.LoggerWriter
+var loggerWriter = logger.Writer()
 
 func (dockerControl DockerControl) StopContainer(containerName string) {
 	dockerExecutablePath := getDockerExecutablePath()

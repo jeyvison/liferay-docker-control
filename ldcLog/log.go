@@ -1,36 +1,36 @@
 package ldcLog
 
 import (
+	"flag"
 	"github.com/mitchellh/go-homedir"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
 )
 
-type LogManager struct {
-	Logger       *log.Logger
-	LoggerWriter io.Writer
-}
 
 var (
-	DefaultLogManager LogManager
+	DefaultLogger *log.Logger
 )
 
 func init() {
-	var userDir, _ = homedir.Dir()
 
-	logFilePath := filepath.FromSlash(userDir + "/liferay-docker-control.log")
+	devModeFlag := flag.Bool("d", false,"development mode")
 
-	var LogFile, _ = os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	flag.Parse()
 
-	var logger = log.New(LogFile, "logging: ", log.Ldate)
+	if *devModeFlag {
+		DefaultLogger = log.New(os.Stdout, ">", log.LstdFlags )
 
-	stdWriter := logger.Writer()
+	}else{
+		var userDir, _ = homedir.Dir()
 
-	DefaultLogManager = LogManager{
-		Logger:       logger,
-		LoggerWriter: stdWriter,
+		logFilePath := filepath.FromSlash(userDir + "/liferay-docker-control.log")
+
+		var LogFile, _ = os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+
+		DefaultLogger = log.New(LogFile, ">", log.LstdFlags)
 	}
+
 
 }

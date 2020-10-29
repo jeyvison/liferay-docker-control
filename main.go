@@ -6,6 +6,7 @@ import (
 	"fyne.io/fyne/app"
 	"fyne.io/fyne/widget"
 	"github.com/jeyvison/liferay-docker-control/ldcDocker"
+	"github.com/jeyvison/liferay-docker-control/ldcLog"
 )
 
 type MainControl struct {
@@ -15,6 +16,8 @@ type MainControl struct {
 }
 
 var dockerControl = ldcDocker.DockerControl{}
+
+var logger = ldcLog.DefaultLogger
 
 func imageVersions() (*widget.Radio, *widget.Box) {
 
@@ -62,9 +65,11 @@ func (mainControl *MainControl) loadUI(app fyne.App) {
 
 		switch liferayVersionRadio.Selected {
 		case "Liferay CE":
+			logger.Println("==========================  Updating CE Master ===================================")
 			dockerControl.StopContainer("liferay-dxp-master")
 			err = dockerControl.RunDocker("liferay-master", "jeyvison/liferay-master:latest", "8080:8080")
 		case "Liferay DXP":
+			logger.Println("==========================  Updating DXP Master ===================================")
 			dockerControl.StopContainer("liferay-master")
 			err = dockerControl.RunDocker("liferay-dxp-master", "192.168.109.41:5000/jeyvison/liferay-dxp-master:latest", "8081:7300")
 		default:
